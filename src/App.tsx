@@ -48,6 +48,7 @@ export default function App() {
   const [banks, setBanks] = useState<QuestionBank[]>([DEFAULT_BANK]);
   const [selectedBankId, setSelectedBankId] = useState<string>('default');
   const [editingBank, setEditingBank] = useState<QuestionBank | null>(null);
+  const [sessionQuestions, setSessionQuestions] = useState<Question[]>([]);
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -78,14 +79,31 @@ export default function App() {
     return banks.find(b => b.id === selectedBankId) || DEFAULT_BANK;
   }, [banks, selectedBankId]);
 
-  const currentQuestion = currentBank.questions[currentQuestionIndex];
+  const currentQuestion = useMemo(() => {
+    return sessionQuestions[currentQuestionIndex] || currentBank.questions[currentQuestionIndex];
+  }, [sessionQuestions, currentQuestionIndex, currentBank]);
 
   const score = useMemo(() => {
     return userAnswers.filter(a => a.isCorrect).length;
   }, [userAnswers]);
 
   const handleStartQuiz = (bankId: string) => {
+    const bank = banks.find(b => b.id === bankId) || DEFAULT_BANK;
+    
+    // Shuffle questions and their options
+    const shuffledQuestions = [...bank.questions]
+      .sort(() => Math.random() - 0.5)
+      .map(q => ({
+        ...q,
+        options: [...q.options].sort(() => Math.random() - 0.5)
+      }));
+
     setSelectedBankId(bankId);
+    // We need a way to store the session questions if we want them to stay shuffled
+    // but not change the original bank. 
+    // Let's add a state for sessionQuestions.
+    setSessionQuestions(shuffledQuestions);
+    
     setCurrentQuestionIndex(0);
     setSelectedOption(null);
     setIsSubmitted(false);
@@ -114,7 +132,7 @@ export default function App() {
   };
 
   const handleNext = () => {
-    if (currentQuestionIndex < currentBank.questions.length - 1) {
+    if (currentQuestionIndex < sessionQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedOption(null);
       setIsSubmitted(false);
@@ -496,13 +514,13 @@ export default function App() {
           <div className="flex items-center gap-4">
             <div className="hidden md:flex flex-col items-end mr-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">进度</span>
-              <span className="text-sm font-black text-slate-700">{currentQuestionIndex + 1} / {currentBank.questions.length}</span>
+              <span className="text-sm font-black text-slate-700">{currentQuestionIndex + 1} / {sessionQuestions.length}</span>
             </div>
             <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
               <motion.div 
                 className="h-full bg-indigo-500"
                 initial={{ width: 0 }}
-                animate={{ width: `${((currentQuestionIndex + 1) / currentBank.questions.length) * 100}%` }}
+                animate={{ width: `${((currentQuestionIndex + 1) / sessionQuestions.length) * 100}%` }}
               />
             </div>
           </div>
@@ -579,7 +597,7 @@ export default function App() {
                     onClick={handleNext}
                     className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
                   >
-                    {currentQuestionIndex === currentBank.questions.length - 1 ? "查看最终评分" : "下一题 / Next"}
+                    {currentQuestionIndex === sessionQuestions.length - 1 ? "查看最终评分" : "下一题 / Next"}
                     <ChevronRight size={20} />
                   </button>
                 )}
@@ -684,11 +702,11 @@ export default function App() {
         
         <div className="flex justify-center items-baseline gap-3 mb-10">
           <span className="text-8xl font-black text-indigo-600 tracking-tighter">{score}</span>
-          <span className="text-3xl text-slate-300 font-bold">/ {currentBank.questions.length}</span>
+          <span className="text-3xl text-slate-300 font-bold">/ {sessionQuestions.length}</span>
         </div>
 
         <p className="text-xl text-slate-700 mb-12 leading-relaxed font-medium px-4">
-          {getEncouragement(score, currentBank.questions.length)}
+          {getEncouragement(score, sessionQuestions.length)}
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
@@ -709,8 +727,22 @@ export default function App() {
               进阶资源
             </h3>
             <div className="space-y-3">
-              <a href="#" className="text-sm text-indigo-600 hover:underline block font-medium">TOEFL 语法核心考点指南</a>
-              <a href="#" className="text-sm text-indigo-600 hover:underline block font-medium">SAT 写作与语言部分真题解析</a>
+              <a 
+                href="https://www.ets.org/toefl/ibt/prepare/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-sm text-indigo-600 hover:underline flex items-center gap-1 font-medium"
+              >
+                TOEFL 官方备考资源中心 <ExternalLink size={12} />
+              </a>
+              <a 
+                href="https://www.crimsoneducation.org/us/practice-tests/sat?gad_source=1&gad_campaignid=23326611822&gbraid=0AAAAADLRF7wU_r9X7Z7Ihklp9sd-dZ7nV&gclid=Cj0KCQiA7-rMBhCFARIsAKnLKtCwZkFx9AfsaaepzKOx9kArpBR49uo5b0H07ZI1AOjCArCLU7uvrjcaAtjaEALw_wcB" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-sm text-indigo-600 hover:underline flex items-center gap-1 font-medium"
+              >
+                Crimson Education SAT 模拟测试 <ExternalLink size={12} />
+              </a>
             </div>
           </div>
         </div>
